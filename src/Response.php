@@ -2,7 +2,6 @@
 
 namespace Amp\Http\Client;
 
-use Amp\ByteStream\Payload;
 use Amp\ByteStream\ReadableBuffer;
 use Amp\ByteStream\ReadableStream;
 use Amp\ForbidCloning;
@@ -27,7 +26,7 @@ final class Response extends Message
 
     private Request $request;
 
-    private Payload $body;
+    private ResponseBody $body;
 
     /** @var Future<Trailers> */
     private Future $trailers;
@@ -200,26 +199,20 @@ final class Response extends Message
     /**
      * Retrieve the response body.
      */
-    public function getBody(): Payload
+    public function getBody(): ResponseBody
     {
         return $this->body;
     }
 
-    public function setBody(Payload|ReadableStream|string|int|float|bool|null $body): void
+    public function setBody(ReadableStream|string|int|float|bool|null $body): void
     {
-        if ($body instanceof Payload) {
-            $this->body = $body;
-        } elseif ($body === null) {
-            $this->body = new Payload(new ReadableBuffer());
-        } elseif (\is_string($body)) {
-            $this->body = new Payload(new ReadableBuffer($body));
-        } elseif (\is_scalar($body)) {
-            $this->body = new Payload(new ReadableBuffer(\var_export($body, true)));
-        } elseif ($body instanceof ReadableStream) {
-            $this->body = new Payload($body);
-        } else {
-            throw new \TypeError("Invalid body type: " . \gettype($body));
-        }
+        $this->body = match (true) {
+            $body instanceof ResponseBody => $body,
+            $body instanceof ReadableStream => new ResponseBody($body),
+            \is_string($body), $body === null => new ResponseBody(new ReadableBuffer($body)),
+            \is_scalar($body) => new ResponseBody(new ReadableBuffer(\var_export($body, true))),
+            default => throw new \TypeError("Invalid body type: " . \get_debug_type($body)),
+        };
     }
 
     /**
